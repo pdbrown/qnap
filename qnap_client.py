@@ -6,6 +6,8 @@ import urllib
 
 from get_sid import ezEncode
 
+logger = logging.getLogger(__name__)
+
 class QnapClient():
     def __init__(self, url):
         urlparse.urlparse(url)
@@ -37,7 +39,7 @@ class QnapClient():
             params_auth['sid'] = self.sid
         res = requests.post(url, params_auth)
         if res.status_code != 200:
-            logging.error('Request for %s failed with %d:' % [path, res.status_code])
+            logger.error('Request for %s failed with %d:' % [path, res.status_code])
             return None
         return res
 
@@ -50,6 +52,6 @@ class QnapClient():
                 url = url + "?sid=" + urllib.quote(self.sid)
         res = requests.post(url, data, headers={'content-type': 'multipart/form-data;'})
         if res.status_code != 200:
-            logging.error('Request for %s failed with status %d' % (path, res.status_code))
+            logger.error('Request for %s failed with status %d' % (path, res.status_code))
             return None
         return res

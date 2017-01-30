@@ -6,6 +6,9 @@ import re
 import time
 from requests_toolbelt.multipart import encoder
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 class FileStation():
     """
     Access QNAP FileStation.
@@ -21,7 +24,7 @@ class FileStation():
     @staticmethod
     def decode_response(res, failure_msg):
         if res is None:
-            logging.error(failure_msg)
+            logger.error(failure_msg)
             return None
         return json.loads(res.text)
 
@@ -38,7 +41,14 @@ class FileStation():
         List files in a directory.
         """
         res = self.post_form('get_list', {'path': path, 'limit': limit})
-        return FileStation.decode_response(res, 'Failed to list path')
+        res = FileStation.decode_response(res, 'Failed to list path')
+        if res is None:
+            return None
+        if 'status' in res and res['status'] == 5:
+            logger.error('Failed to list directory because it doesn\'t exist: ' + path)
+            return None
+        else:
+            return res
 
     def stat(self, path):
         """
@@ -57,6 +67,7 @@ class FileStation():
         dirname = os.path.dirname(path)
         basename = os.path.basename(path)
 
+        logger.info("Renaming %s to %s" % (path, new_filename))
         res = self.post_form('rename', {'path': dirname,
                                         'source_name': basename,
                                         'dest_name': new_filename})
@@ -64,10 +75,10 @@ class FileStation():
         if res is None:
             return None
         if res['status'] == 2:
-            logging.error('Failed to rename file because renaming would have overwritten an existing file.')
+            logger.error('Failed to rename file because renaming would have overwritten an existing file.')
             return None
         elif res['status'] != 1:
-            logging.error('Failed to rename file for unknown reason.')
+            logger.error('Failed to rename file for unknown reason.')
             return None
         else:
             return res
@@ -79,6 +90,7 @@ class FileStation():
         dirname = os.path.dirname(path)
         basename = os.path.basename(path)
 
+        logger.info("Deleting " + path)
         res = self.post_form('delete', {'path': dirname,
                                         'file_name': basename,
                                         'file_total': 1,
@@ -108,7 +120,7 @@ class FileStation():
              'source_file': basename})
 
         if res is None:
-            logging.error('Failed to download ' + path)
+            logger.error('Failed to download ' + path)
             return None
         return res
 
@@ -130,22 +142,22 @@ class FileStation():
             if now_epoch_sec > self.last_update_epoch_seconds + 5:
                 self.last_update_epoch_seconds = now_epoch_sec
                 mb_uploaded = self.bytes_uploaded / 1024.0 / 1024
-                print "Uploaded %f of %f MB at %f MB/s" % (
+                logger.info("Uploaded %f of %f MB at %f MB/s" % (
                     mb_uploaded,
                     self.total_size_mb,
-                    mb_uploaded / (now_epoch_sec - self.time_started_epoch_seconds))
+                    mb_uploaded / (now_epoch_sec - self.time_started_epoch_seconds)))
 
         def finish(self):
-            print "Finished uploading %f MB in %f seconds." % (
+            logger.info("Finished uploading %f MB in %f seconds." % (
                 self.total_size_mb,
-                time.time() - self.time_started_epoch_seconds)
+                time.time() - self.time_started_epoch_seconds))
 
-    def upload(self, local_src_path, remote_dest_path, overwrite=False):
+    def upload(self, local_src_path, remote_dest_path, overwrite=False, quiet=False):
         """
         Upload file.
         """
         if remote_dest_path[0] != '/':
-            logging.error("remote_dest_path must be absolute and begin with /")
+            logger.error("remote_dest_path must be absolute and begin with /")
             return None
 
         remote_dirname = os.path.dirname(remote_dest_path)
@@ -153,16 +165,21 @@ class FileStation():
 
         # From docs:
         # Where to put tmp (If you used share root path(/Download, /Public, ...)
-        # as the value of parameter “upload_root_dir” , it will be auto cleaned in period of 7 days later.
+        # as the value of parameter "upload_root_dir", it will be auto cleaned in period of 7 days later.
         if remote_dirname.count("/") <= 1:
             upload_root_dir = remote_dirname
         else:
-            upload_root_dir = "/" + re.split("\/", remote_dirname)[0]
+            upload_root_dir = "/" + re.split("\/", remote_dirname)[1]
+            if len(upload_root_dir) < 2:
+                logger.error('Unable to determine valid qnap tmp dir from %s, got %s' % (
+                    remote_dir_name, upload_root_dir))
+                return None
+
 
         start_res = self.post_form('start_chunked_upload', {'upload_root_dir': upload_root_dir})
         start_res = FileStation.decode_response(start_res, 'Failed to start chunked upload')
         if start_res['status'] != 0:
-            logging.error('Failed to start chunked upload with error code %d' % start_res['status'])
+            logger.error('Failed to start chunked upload with error code %d' % start_res['status'])
             return None
 
         upload_id = start_res['upload_id']
@@ -183,8 +200,12 @@ class FileStation():
             e = encoder.MultipartEncoder(
                 fields=([('fileName', remote_basename),
                          ('file', ('blob', src_file, 'application/octet-stream'))]))
-            m = encoder.MultipartEncoderMonitor(e, progress_reporter.report)
-            res = self.qnap_client.post_multipart(request_path, m)
+            if quiet:
+                res = self.qnap_client.post_multipart(request_path, e)
+            else:
+                m = encoder.MultipartEncoderMonitor(e, progress_reporter.report)
+                res = self.qnap_client.post_multipart(request_path, m)
 
-        progress_reporter.finish()
-        return res
+        if not quiet:
+            progress_reporter.finish()
+        return FileStation.decode_response(res, 'Failed to upload file')
