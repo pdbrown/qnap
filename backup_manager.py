@@ -13,30 +13,26 @@ MAX_TOTAL_BACKUPS = 10000
 
 def cmp_backup_names(x, y):
     """
-    Comparator for backup file names with date and possible ordinal suffix:
-    "abc.2016-01-01" < "abc.2016-01-02.2" < "abc.2016-01-02.10"
-    Behavior is undefined if file names differ other than their suffixes.
+    Comparator for backup file names with date and possible epoch time suffix:
+    "abc.2016-01-01" < "abc.2016-01-02.1458239586" < "abc.2016-01-02.99999999999999"
     """
-    xs = x.split(".")
-    ys = y.split(".")
-    max_len = max(len(xs), len(ys))
-    if len(xs) < max_len:
-        x_ord = 0
-        x_date = xs[-1]
-    else:
-        x_ord = int(xs[-1])
-        x_date = xs[-2]
-    if len(ys) < max_len:
-        y_ord = 0
-        y_date = ys[-1]
-    else:
-        y_ord = int(ys[-1])
-        y_date = ys[-2]
+    r = "^.*\.(\d{4}-\d{2}-\d{2})(\.(\d+))?$"
+    xm = re.match(r, x)
+    ym = re.match(r, y)
+    if xm.group(1) is None:
+        raise RuntimeError("Filename %s doesn't end in date stamp." % x)
+    if ym.group(1) is None:
+        raise RuntimeError("Filename %s doesn't end in date stamp." % y)
+    x_date = xm.group(1)
+    y_date = xm.group(1)
+    x_epoch_time = xm.group(3)
+    y_epoch_time = xm.group(3)
 
     if x_date == y_date:
-        return x_ord - y_ord
+        return cmp(x_epoch_time, y_epoch_time)
     else:
         return cmp(x_date, y_date)
+
 
 class BackupManager():
 

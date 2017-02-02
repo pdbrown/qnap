@@ -17,7 +17,7 @@ python backup_cli.py -n 5 important-file.txt /backups/important-file.txt
 
 You should now see a copy of important-file.txt at
 `/backups/important-file.txt.2017-01-29`. Note that the current date is appended
-to the file name. If run more than once a day, the current unix epoch is
+to the file name. If run more than once a day, the current unix epoch time stamp is
 appended too. The `-n 5` switch means the script will keep the 5 most recent
 copies, and will delete older ones.
 
