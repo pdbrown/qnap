@@ -24,9 +24,9 @@ def cmp_backup_names(x, y):
     if ym.group(1) is None:
         raise RuntimeError("Filename %s doesn't end in date stamp." % y)
     x_date = xm.group(1)
-    y_date = xm.group(1)
+    y_date = ym.group(1)
     x_epoch_time = xm.group(3)
-    y_epoch_time = xm.group(3)
+    y_epoch_time = ym.group(3)
 
     if x_date == y_date:
         return cmp(x_epoch_time, y_epoch_time)
@@ -70,7 +70,7 @@ class BackupManager():
         for i in range(num_to_keep):
             if not backups:
                 break
-            backups.pop() # remove backups we want to keep
+            backups.pop() # .pop() modifies the array, removing last element: remove backups we want to keep
         for backup in backups:
             if not self.fs.delete(os.path.join(remote_dirname, backup)):
                 raise RuntimeError("Failed to delete old backup " + os.path.join(remote_dirname, backup))
