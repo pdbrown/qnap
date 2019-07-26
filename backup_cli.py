@@ -55,4 +55,4 @@ if not logged_in:
 fs = FileStation(qnap)
 backups = BackupManager(fs)
 
-backups.upload_backup(args[0], args[1], options.count, options.quiet)
+backups.upload_backup(local_src_path, remote_backup, options.count, options.quiet)
