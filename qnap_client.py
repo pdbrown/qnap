@@ -8,16 +8,19 @@ from get_sid import ezEncode
 
 logger = logging.getLogger(__name__)
 
+# verify: Whether/how to verify SSL requests. Is boolean or path to PEM certificate.
 class QnapClient():
-    def __init__(self, url):
+    def __init__(self, url, verify=True):
         urlparse.urlparse(url)
         self.base_url = url
+        self.verify = verify
         self.sid = None
 
     def login(self, user, passwd):
         url = urlparse.urljoin(self.base_url, '/cgi-bin/authLogin.cgi')
         res = requests.post(url, {'user': user.replace('\\', '+'),
-                                  'pwd': ezEncode(passwd)})
+                                  'pwd': ezEncode(passwd)},
+                            verify=self.verify)
         if res.status_code != 200:
             return False
 
@@ -37,7 +40,7 @@ class QnapClient():
         params_auth = params.copy()
         if self.sid:
             params_auth['sid'] = self.sid
-        res = requests.post(url, params_auth)
+        res = requests.post(url, params_auth, verify=self.verify)
         if res.status_code != 200:
             logger.error('Request for %s failed with %d:' % [path, res.status_code])
             return None
@@ -50,7 +53,7 @@ class QnapClient():
                 url = url + "&sid=" + urllib.quote(self.sid)
             else:
                 url = url + "?sid=" + urllib.quote(self.sid)
-        res = requests.post(url, data, headers={'content-type': 'multipart/form-data;'})
+        res = requests.post(url, data, headers={'content-type': 'multipart/form-data;'}, verify=self.verify)
         if res.status_code != 200:
             logger.error('Request for %s failed with status %d' % (path, res.status_code))
             return None

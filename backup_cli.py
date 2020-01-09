@@ -17,12 +17,15 @@ from backup_manager import BackupManager
 
 logging.basicConfig()
 
+
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
+
 parser = OptionParser(usage="usage: %prog [-q] [-c creds_file] -n <num_to_keep> local_file remote_backup_path")
 parser.add_option("-n", type="int", dest="count", help="Number of old backups to keep")
-parser.add_option("-c", type="string", dest="creds", help="Credentials json file.")
+parser.add_option("-c", type="string", dest="creds", help="Credentials json file")
+parser.add_option("-C", type="string", dest="cert", help="Optional NAS server PEM certificate file")
 parser.add_option("-q", action="store_true", dest="quiet", help="Quiet")
 (options, args) = parser.parse_args()
 if len(args) < 2:
@@ -45,7 +48,12 @@ if not os.path.isfile(creds):
 with open(creds) as creds_file:
     creds = json.load(creds_file)
 
-qnap = QnapClient(creds['url'])
+if options.cert:
+    verify = options.cert
+else:
+    verify = True
+
+qnap = QnapClient(creds['url'], verify)
 logged_in = qnap.login(creds['username'], creds['password'])
 creds = None
 if not logged_in:
